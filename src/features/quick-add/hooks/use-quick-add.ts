@@ -32,6 +32,7 @@ export function useQuickAdd(workspaceId: string, open: boolean): UseQuickAddRetu
   // Lazy-load history on first open; reset the input each time it opens.
   useEffect(() => {
     if (!open) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setInput("");
     setOverrideCategory(null);
     if (hasLoaded) return;
@@ -81,6 +82,19 @@ export function useQuickAdd(workspaceId: string, open: boolean): UseQuickAddRetu
       };
       await createTransaction(tx);
       await notifyBudgetThreshold(workspaceId, tx, transactions, categories);
+
+      // Pendo Track Event: transaction saved via Quick Add NLP palette
+      if (typeof pendo !== "undefined") {
+        pendo.track("quick_add_transaction_saved", {
+          transaction_type: tx.type,
+          category_name: effectiveCategory.name,
+          category_was_guessed: parsed.categoryGuessed,
+          category_was_overridden: overrideCategory !== null,
+          date_was_explicit: parsed.dateExplicit,
+          type_was_explicit: parsed.typeExplicit,
+        });
+      }
+
       // Keep local history fresh so the next entry's inference sees this one.
       setTransactions((prev) => [tx, ...prev]);
       setInput("");
