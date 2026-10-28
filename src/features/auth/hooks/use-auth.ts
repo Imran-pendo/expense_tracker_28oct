@@ -6,6 +6,20 @@ import { getWorkspacesByUserId } from "@/lib/db/repositories/workspaces.repo";
 import { clearSession, getSession, saveSession } from "@/lib/session";
 import type { Session, User, Workspace } from "@/types";
 
+function identifyPendoVisitor(user: User, workspace: Workspace | null): void {
+  pendo.identify({
+    visitor: {
+      id: user.id,
+      full_name: user.displayName,
+      username: user.username,
+      avatar_initials: user.avatarInitials,
+      created_at: user.createdAt,
+      currency: workspace?.currency ?? "",
+      locale: workspace?.locale ?? "",
+    },
+  });
+}
+
 interface AuthState {
   user: User | null;
   workspace: Workspace | null;
@@ -44,10 +58,16 @@ export function useAuth(): AuthState & AuthActions {
       }
       setUser(storedUser);
 
+      let restoredWorkspace: Workspace | null = null;
       if (session.workspaceId) {
         const storedWorkspace = await db.get("workspaces", session.workspaceId);
-        if (storedWorkspace) setWorkspace(storedWorkspace);
+        if (storedWorkspace) {
+          setWorkspace(storedWorkspace);
+          restoredWorkspace = storedWorkspace;
+        }
       }
+
+      identifyPendoVisitor(storedUser, restoredWorkspace);
     } catch {
       clearSession();
     } finally {
@@ -85,6 +105,8 @@ export function useAuth(): AuthState & AuthActions {
     setUser(newUser);
     const session: Session = { userId: newUser.id, workspaceId: "" };
     saveSession(session);
+
+    identifyPendoVisitor(newUser, null);
   }, []);
 
   const signIn = useCallback(async (username: string, password: string) => {
@@ -104,12 +126,15 @@ export function useAuth(): AuthState & AuthActions {
       workspaceId: activeWorkspace?.id ?? "",
     };
     saveSession(session);
+
+    identifyPendoVisitor(storedUser, activeWorkspace);
   }, []);
 
   const signOut = useCallback(() => {
     clearSession();
     setUser(null);
     setWorkspace(null);
+    pendo.clearSession();
   }, []);
 
   const setActiveWorkspace = useCallback((ws: Workspace) => {
