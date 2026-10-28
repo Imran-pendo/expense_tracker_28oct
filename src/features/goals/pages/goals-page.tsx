@@ -35,6 +35,15 @@ export function GoalsPage() {
         deadline: values.deadline || undefined,
         color: values.color,
       });
+
+      // Pendo Track Event: savings goal created
+      if (typeof pendo !== "undefined") {
+        pendo.track("goal_created", {
+          target_amount: values.targetAmount,
+          has_deadline: !!values.deadline,
+        });
+      }
+
       setShowForm(false);
       toast.success("Goal created");
     } catch {
@@ -67,6 +76,20 @@ export function GoalsPage() {
         date: values.date,
         note: values.note || undefined,
       });
+
+      // Pendo Track Event: contribution added to a savings goal
+      if (typeof pendo !== "undefined") {
+        const previousTotal = contributingGoal.contributions.reduce((sum, c) => sum + c.amount, 0);
+        const newTotal = previousTotal + values.amount;
+        const progressPercent = Math.round((newTotal / contributingGoal.targetAmount) * 100);
+        pendo.track("goal_contribution_added", {
+          contribution_amount: values.amount,
+          goal_target_amount: contributingGoal.targetAmount,
+          goal_progress_percent: progressPercent,
+          is_goal_completed: newTotal >= contributingGoal.targetAmount,
+        });
+      }
+
       setContributingGoal(null);
       toast.success("Contribution added");
     } catch {

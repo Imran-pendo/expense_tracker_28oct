@@ -43,6 +43,7 @@ export function TransactionsPage() {
   }, [transactionIdsKey]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     refreshAttachmentCounts();
   }, [refreshAttachmentCounts]);
   const [filters, setFilters] = useState<TransactionFilters>({
@@ -72,6 +73,20 @@ export function TransactionsPage() {
     try {
       const created = await addTransaction({ ...values, workspaceId: workspace!.id, notes: values.notes ?? "" });
       await addAttachments.flushStaged(created.id);
+
+      // Pendo Track Event: transaction created via form dialog
+      if (typeof pendo !== "undefined") {
+        const category = categories.find((c) => c.id === values.categoryId);
+        const stagedCount = addAttachments.stagedFiles.length;
+        pendo.track("transaction_created", {
+          transaction_type: values.type,
+          category_name: category?.name ?? "unknown",
+          is_recurring: values.isRecurring,
+          has_attachments: stagedCount > 0,
+          attachment_count: stagedCount,
+        });
+      }
+
       setShowForm(false);
       toast.success("Transaction added");
     } catch {
